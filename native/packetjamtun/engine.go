@@ -11,6 +11,7 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/xjasonlyu/tun2socks/v2/core"
@@ -74,9 +75,17 @@ func Start(tunFD int64, profileJSON string, seed int64, listener Listener) (*Eng
 	if err != nil {
 		return nil, err
 	}
-	f, err := os.OpenFile("/proc/self/fd/"+itoa(tunFD), os.O_RDWR, 0)
+	// Reopening /proc/self/fd is denied by SELinux on some Android builds.
+	// dup(2) creates the owned descriptor required by the engine without
+	// traversing procfs.
+	duplicatedFD, err := syscall.Dup(int(tunFD))
 	if err != nil {
 		return nil, err
+	}
+	f := os.NewFile(uintptr(duplicatedFD), "packetjam-tun")
+	if f == nil {
+		_ = syscall.Close(duplicatedFD)
+		return nil, errors.New("could not own duplicated TUN descriptor")
 	}
 	e := &Engine{file: f, listener: listener, stop: make(chan struct{})}
 	e.profile.Store(p)
@@ -385,17 +394,4 @@ func max(a, b int) int {
 		return a
 	}
 	return b
-}
-func itoa(v int64) string {
-	if v == 0 {
-		return "0"
-	}
-	var buf [20]byte
-	i := len(buf)
-	for v > 0 {
-		i--
-		buf[i] = byte('0' + v%10)
-		v /= 10
-	}
-	return string(buf[i:])
 }

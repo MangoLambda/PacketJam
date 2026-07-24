@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class MainUiState(
-    val selected: NetworkProfile = BuiltInProfiles.thirdGeneration,
+    val selected: NetworkProfile = BuiltInProfiles.fading3g,
     val active: NetworkProfile? = null,
     val status: app.packetjam.model.VpnStatus = app.packetjam.model.VpnStatus.STOPPED,
     val stats: app.packetjam.model.TrafficStats = app.packetjam.model.TrafficStats(),

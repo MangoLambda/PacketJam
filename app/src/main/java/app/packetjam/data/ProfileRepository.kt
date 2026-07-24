@@ -15,8 +15,8 @@ class ProfileRepository(private val context: Context) {
     private val selectedKey = stringPreferencesKey("selected_profile")
 
     val selectedProfile: Flow<NetworkProfile> = context.profileDataStore.data.map { preferences ->
-        val id = preferences[selectedKey] ?: BuiltInProfiles.thirdGeneration.id
-        BuiltInProfiles.all.firstOrNull { it.id == id } ?: BuiltInProfiles.thirdGeneration
+        val id = preferences[selectedKey] ?: BuiltInProfiles.fading3g.id
+        BuiltInProfiles.all.firstOrNull { it.id == id } ?: BuiltInProfiles.fading3g
     }
 
     suspend fun select(profile: NetworkProfile) {

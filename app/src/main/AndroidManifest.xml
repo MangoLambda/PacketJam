@@ -11,6 +11,7 @@
         android:allowBackup="true"
         android:icon="@drawable/ic_packetjam"
         android:label="@string/app_name"
+        android:roundIcon="@drawable/ic_packetjam"
         android:supportsRtl="true"
         android:theme="@style/Theme.PacketJam">
         <activity

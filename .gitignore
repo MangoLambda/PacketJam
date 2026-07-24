@@ -1,12 +1,8 @@
-# Android / Gradle
 .gradle/
-build/
-**/build/
-local.properties
-
-# IDE
 .idea/
+local.properties
+**/build/
 *.iml
-
-# OS
-.DS_Store
+app/libs/*.aar
+!app/libs/.gitkeep
+!app/libs/packetjam-tun.aar

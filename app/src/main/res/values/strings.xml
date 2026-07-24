@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">PacketJam</string>
+    <string name="vpn_channel_name">Network impairment</string>
+    <string name="vpn_channel_description">Shows when PacketJam is shaping device traffic</string>
+</resources>

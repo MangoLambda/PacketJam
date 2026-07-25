@@ -55,6 +55,7 @@ import app.packetjam.model.BuiltInProfiles
 import app.packetjam.model.NetworkProfile
 import app.packetjam.model.TrafficStats
 import app.packetjam.model.VpnStatus
+import java.util.Locale
 
 private val Ink = Color(0xFF081015)
 private val Panel = Color(0xFF111C22)
@@ -249,8 +250,24 @@ private fun StatsPanel(stats: TrafficStats, profile: NetworkProfile) {
             }
             Spacer(Modifier.height(18.dp))
             Row {
-                Rate(Icons.Rounded.ArrowDownward, "DOWN", stats.downloadBytesPerSecond, profile.download.rateKbps, Modifier.weight(1f))
-                Rate(Icons.Rounded.ArrowUpward, "UP", stats.uploadBytesPerSecond, profile.upload.rateKbps, Modifier.weight(1f))
+                Rate(
+                    Icons.Rounded.ArrowDownward,
+                    "DOWN",
+                    stats.downloadBytesPerSecond,
+                    stats.downloadBytes,
+                    "received",
+                    profile.download.rateKbps,
+                    Modifier.weight(1f),
+                )
+                Rate(
+                    Icons.Rounded.ArrowUpward,
+                    "UP",
+                    stats.uploadBytesPerSecond,
+                    stats.uploadBytes,
+                    "sent",
+                    profile.upload.rateKbps,
+                    Modifier.weight(1f),
+                )
             }
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -264,18 +281,44 @@ private fun StatsPanel(stats: TrafficStats, profile: NetworkProfile) {
 }
 
 @Composable
-private fun Rate(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, bytes: Long, limit: Int, modifier: Modifier) {
+private fun Rate(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    bytesPerSecond: Long,
+    totalBytes: Long,
+    totalLabel: String,
+    limit: Int,
+    modifier: Modifier,
+) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, tint = Mint, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
         Column {
             Text(label, color = Muted, fontSize = 9.sp, letterSpacing = 1.sp)
             Text(
-                if (bytes == 0L) (if (limit == 0) "∞" else "$limit kbps") else "${bytes / 1024} KB/s",
+                if (bytesPerSecond == 0L) (if (limit == 0) "∞" else "$limit kbps") else "${bytesPerSecond / 1024} KB/s",
                 color = Color.White, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
+            )
+            Text(
+                "${formatBytes(totalBytes)} $totalLabel",
+                color = Muted,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 10.sp,
             )
         }
     }
+}
+
+internal fun formatBytes(bytes: Long): String {
+    if (bytes < 1024) return "$bytes B"
+    val units = arrayOf("KB", "MB", "GB", "TB", "PB", "EB")
+    var value = bytes.toDouble()
+    var unitIndex = -1
+    do {
+        value /= 1024
+        unitIndex++
+    } while (value >= 1024 && unitIndex < units.lastIndex)
+    return String.format(Locale.US, "%.1f %s", value, units[unitIndex])
 }
 
 @Composable

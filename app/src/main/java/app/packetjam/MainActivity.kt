@@ -13,6 +13,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -127,23 +128,29 @@ private fun Dashboard(
             Spacer(Modifier.height(26.dp))
             PowerControl(state, onToggle)
             Spacer(Modifier.height(28.dp))
-            ProfileStrip(state.selected, onSelect, enabled = !running)
-            Spacer(Modifier.height(18.dp))
-            ProfileDetails(state.selected)
-            Spacer(Modifier.height(14.dp))
-            StatsPanel(state.stats, state.selected)
-            AnimatedVisibility(state.failure != null) {
+            Column(
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                ProfileStrip(state.selected, onSelect, enabled = !running)
+                Spacer(Modifier.height(18.dp))
+                ProfileDetails(state.selected)
+                Spacer(Modifier.height(14.dp))
+                StatsPanel(state.stats, state.selected)
+                AnimatedVisibility(state.failure != null) {
+                    Text(
+                        state.failure.orEmpty(), color = Color(0xFFFF8C8C), fontSize = 13.sp,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp),
+                    )
+                }
                 Text(
-                    state.failure.orEmpty(), color = Color(0xFFFF8C8C), fontSize = 13.sp,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp),
+                    "LOCAL VPN · NO PAYLOAD INSPECTION",
+                    color = Muted, fontSize = 10.sp, letterSpacing = 1.5.sp,
+                    modifier = Modifier.padding(vertical = 18.dp),
                 )
             }
-            Spacer(Modifier.weight(1f))
-            Text(
-                "LOCAL VPN · NO PAYLOAD INSPECTION",
-                color = Muted, fontSize = 10.sp, letterSpacing = 1.5.sp,
-                modifier = Modifier.padding(bottom = 18.dp),
-            )
         }
     }
 }

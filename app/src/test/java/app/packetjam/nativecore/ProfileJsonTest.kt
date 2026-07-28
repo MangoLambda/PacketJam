@@ -13,7 +13,7 @@ class ProfileJsonTest {
     }
 
     @Test fun omitsBurstForSteadyProfile() {
-        val json = BuiltInProfiles.stableWifi.toNativeJson()
+        val json = BuiltInProfiles.normal4g.toNativeJson()
         assertFalse(json.contains("\"burst\""))
     }
 }

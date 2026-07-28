@@ -37,13 +37,19 @@ type limits struct {
 	ReorderPercent   float64 `json:"reorderPercent"`
 }
 
+type burstSchedule struct {
+	ImpairedSeconds int `json:"impairedSeconds"`
+	HealthySeconds  int `json:"healthySeconds"`
+}
+
 type profile struct {
-	LatencyMs    int    `json:"latencyMs"`
-	JitterMs     int    `json:"jitterMs"`
-	QueuePackets int    `json:"queuePackets"`
-	Offline      bool   `json:"offline"`
-	Upload       limits `json:"upload"`
-	Download     limits `json:"download"`
+	LatencyMs    int            `json:"latencyMs"`
+	JitterMs     int            `json:"jitterMs"`
+	QueuePackets int            `json:"queuePackets"`
+	Offline      bool           `json:"offline"`
+	Upload       limits         `json:"upload"`
+	Download     limits         `json:"download"`
+	Burst        *burstSchedule `json:"burst,omitempty"`
 }
 
 type counters struct {
@@ -54,15 +60,16 @@ type counters struct {
 
 // Engine owns the duplicated TUN descriptor, schedulers, and gVisor stack.
 type Engine struct {
-	file     *os.File
-	endpoint *iobased.Endpoint
-	netstack *stack.Stack
-	profile  atomic.Pointer[profile]
-	stats    counters
-	listener Listener
-	stop     chan struct{}
-	once     sync.Once
-	wg       sync.WaitGroup
+	file      *os.File
+	endpoint  *iobased.Endpoint
+	netstack  *stack.Stack
+	profile   atomic.Pointer[profile]
+	startedAt time.Time
+	stats     counters
+	listener  Listener
+	stop      chan struct{}
+	once      sync.Once
+	wg        sync.WaitGroup
 }
 
 // Start duplicates tunFD through /proc, starts the two directional packet
@@ -87,7 +94,9 @@ func Start(tunFD int64, profileJSON string, seed int64, listener Listener) (*Eng
 		_ = syscall.Close(duplicatedFD)
 		return nil, errors.New("could not own duplicated TUN descriptor")
 	}
-	e := &Engine{file: f, listener: listener, stop: make(chan struct{})}
+	e := &Engine{
+		file: f, listener: listener, stop: make(chan struct{}), startedAt: time.Now(),
+	}
 	e.profile.Store(p)
 
 	upload := newScheduler(e, true, seed)
@@ -146,6 +155,9 @@ func decodeProfile(raw string) (*profile, error) {
 	}
 	if p.QueuePackets < 1 {
 		p.QueuePackets = 1
+	}
+	if p.Burst != nil && (p.Burst.ImpairedSeconds < 1 || p.Burst.HealthySeconds < 1) {
+		return nil, errors.New("burst windows must be at least one second")
 	}
 	return &p, nil
 }
@@ -227,6 +239,7 @@ type scheduler struct {
 	engine    *Engine
 	upload    bool
 	random    *rand.Rand
+	now       func() time.Time
 	input     chan []byte
 	output    chan []byte
 	queue     packetHeap
@@ -237,6 +250,7 @@ type scheduler struct {
 func newScheduler(e *Engine, upload bool, seed int64) *scheduler {
 	return &scheduler{
 		engine: e, upload: upload, random: rand.New(rand.NewSource(seed)),
+		now:   time.Now,
 		input: make(chan []byte, 4096), output: make(chan []byte, 4096),
 	}
 }
@@ -310,12 +324,16 @@ func (s *scheduler) writeTUN() {
 }
 
 func (s *scheduler) impair(b []byte) {
+	s.impairAt(b, s.now())
+}
+
+func (s *scheduler) impairAt(b []byte, now time.Time) {
 	p := s.engine.profile.Load()
 	lim := p.Download
 	if s.upload {
 		lim = p.Upload
 	}
-	if p.Offline || s.chance(lim.LossPercent) {
+	if p.Offline {
 		s.engine.stats.dropped.Add(1)
 		return
 	}
@@ -324,20 +342,28 @@ func (s *scheduler) impair(b []byte) {
 		s.engine.stats.dropped.Add(1)
 		return
 	}
-	if len(b) > 0 && s.chance(lim.CorruptPercent) {
+	healthy := burstHealthy(p.Burst, s.engine.startedAt, now)
+	if !healthy && s.chance(lim.LossPercent) {
+		s.engine.stats.dropped.Add(1)
+		return
+	}
+	if !healthy && len(b) > 0 && s.chance(lim.CorruptPercent) {
 		i := s.random.Intn(len(b))
 		b[i] ^= byte(1 << s.random.Intn(8))
 		s.engine.stats.corrupted.Add(1)
 	}
-	jitter := 0
-	if p.JitterMs > 0 {
-		jitter = s.random.Intn(p.JitterMs*2+1) - p.JitterMs
+	release := now
+	if !healthy {
+		jitter := 0
+		if p.JitterMs > 0 {
+			jitter = s.random.Intn(p.JitterMs*2+1) - p.JitterMs
+		}
+		delayMs := p.LatencyMs + jitter
+		if delayMs < 0 {
+			delayMs = 0
+		}
+		release = now.Add(time.Duration(delayMs) * time.Millisecond)
 	}
-	delayMs := p.LatencyMs + jitter
-	if delayMs < 0 {
-		delayMs = 0
-	}
-	release := time.Now().Add(time.Duration(delayMs) * time.Millisecond)
 	if lim.RateKbps > 0 {
 		if release.Before(s.available) {
 			release = s.available
@@ -345,20 +371,29 @@ func (s *scheduler) impair(b []byte) {
 		release = release.Add(time.Duration(len(b)*8*1_000_000/lim.RateKbps) * time.Nanosecond)
 		s.available = release
 	}
-	if s.chance(lim.ReorderPercent) {
+	if !healthy && s.chance(lim.ReorderPercent) {
 		release = release.Add(time.Duration(max(1, p.JitterMs)*2) * time.Millisecond)
 		s.engine.stats.reordered.Add(1)
 	}
-	if release.After(time.Now()) {
+	if release.After(now) {
 		s.engine.stats.delayed.Add(1)
 	}
 	s.order++
 	heap.Push(&s.queue, &queuedPacket{b, release, s.order})
-	if s.chance(lim.DuplicatePercent) && len(s.queue) < p.QueuePackets {
+	if !healthy && s.chance(lim.DuplicatePercent) && len(s.queue) < p.QueuePackets {
 		s.order++
 		heap.Push(&s.queue, &queuedPacket{append([]byte(nil), b...), release.Add(time.Millisecond), s.order})
 		s.engine.stats.duplicated.Add(1)
 	}
+}
+
+func burstHealthy(burst *burstSchedule, startedAt, now time.Time) bool {
+	if burst == nil {
+		return false
+	}
+	impaired := time.Duration(burst.ImpairedSeconds) * time.Second
+	healthy := time.Duration(burst.HealthySeconds) * time.Second
+	return now.Sub(startedAt)%(impaired+healthy) >= impaired
 }
 
 func (s *scheduler) releaseDue() {

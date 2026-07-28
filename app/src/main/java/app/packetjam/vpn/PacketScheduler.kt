@@ -38,6 +38,7 @@ class PacketScheduler(
 
     private var uploadAvailableAt = 0L
     private var downloadAvailableAt = 0L
+    private var burstStartNanos: Long? = null
 
     @Synchronized
     fun offer(bytes: ByteArray, direction: TrafficDirection, nowNanos: Long): Boolean {
@@ -52,26 +53,28 @@ class PacketScheduler(
         }
 
         val limits = limits(direction)
-        if (chance(limits.lossPercent)) {
+        if (burstStartNanos == null) burstStartNanos = nowNanos
+        val healthy = isHealthy(nowNanos)
+        if (!healthy && chance(limits.lossPercent)) {
             counters.dropped++
             return false
         }
         val packet = bytes.copyOf()
-        if (packet.isNotEmpty() && chance(limits.corruptPercent)) {
+        if (!healthy && packet.isNotEmpty() && chance(limits.corruptPercent)) {
             val index = random.nextInt(packet.size)
             packet[index] = (packet[index].toInt() xor (1 shl random.nextInt(8))).toByte()
             counters.corrupted++
         }
 
-        var release = nowNanos + delayNanos()
+        var release = nowNanos + if (healthy) 0 else delayNanos()
         release = max(release, rateLimitedRelease(direction, packet.size, limits.rateKbps, nowNanos))
-        if (chance(limits.reorderPercent)) {
+        if (!healthy && chance(limits.reorderPercent)) {
             release += max(1, profile.jitterMs).toLong() * 2_000_000L
             counters.reordered++
         }
         if (release > nowNanos) counters.delayed++
         queue += ScheduledPacket(packet, direction, release)
-        if (chance(limits.duplicatePercent) && queue.size < profile.queuePackets) {
+        if (!healthy && chance(limits.duplicatePercent) && queue.size < profile.queuePackets) {
             queue += ScheduledPacket(packet.copyOf(), direction, release + 1_000_000L)
             counters.duplicated++
         }
@@ -88,6 +91,15 @@ class PacketScheduler(
 
     private fun limits(direction: TrafficDirection): DirectionLimits =
         if (direction == TrafficDirection.UPLOAD) profile.upload else profile.download
+
+    private fun isHealthy(nowNanos: Long): Boolean {
+        val burst = profile.burst ?: return false
+        if (burst.impairedSeconds <= 0 || burst.healthySeconds <= 0) return false
+        val elapsed = nowNanos - (burstStartNanos ?: nowNanos)
+        val impairedNanos = burst.impairedSeconds.toLong() * 1_000_000_000L
+        val healthyNanos = burst.healthySeconds.toLong() * 1_000_000_000L
+        return elapsed % (impairedNanos + healthyNanos) >= impairedNanos
+    }
 
     private fun chance(percent: Float): Boolean =
         percent > 0f && random.nextDouble() * 100.0 < percent

@@ -54,4 +54,20 @@ class PacketSchedulerTest {
         assertTrue(scheduler.pollDue(999_999_999).isEmpty())
         assertEquals(1, scheduler.pollDue(1_000_000_000).size)
     }
+
+    @Test fun healthyBurstWindowRetainsRateButSkipsLossAndLatency() {
+        val burstProfile = NetworkProfile(
+            id = "burst", name = "Burst", latencyMs = 100, jitterMs = 0,
+            download = DirectionLimits(rateKbps = 8, lossPercent = 100f),
+            upload = DirectionLimits(rateKbps = 8, lossPercent = 100f),
+            queuePackets = 10,
+            burst = app.packetjam.model.BurstSchedule(1, 1),
+        )
+        val scheduler = PacketScheduler(burstProfile, seed = 1)
+
+        assertFalse(scheduler.offer(byteArrayOf(1), TrafficDirection.UPLOAD, 0))
+        assertTrue(scheduler.offer(byteArrayOf(2), TrafficDirection.UPLOAD, 1_000_000_000))
+        assertTrue(scheduler.pollDue(1_000_999_999).isEmpty())
+        assertEquals(1, scheduler.pollDue(1_001_000_000).size)
+    }
 }

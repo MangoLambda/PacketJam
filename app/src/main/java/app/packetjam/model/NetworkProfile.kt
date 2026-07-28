@@ -10,6 +10,7 @@ data class DirectionLimits(
     val reorderPercent: Float = 0f,
 )
 
+/** Periodic radio fading: packets use the configured impairment during the first window. */
 data class BurstSchedule(
     val impairedSeconds: Int,
     val healthySeconds: Int,
@@ -43,11 +44,36 @@ data class NetworkProfile(
 }
 
 object BuiltInProfiles {
+    val stableWifi = NetworkProfile(
+        id = "stable_wifi", name = "Stable Wi-Fi", latencyMs = 25, jitterMs = 8,
+        download = DirectionLimits(25_000, .2f, .05f, .01f, .5f),
+        upload = DirectionLimits(10_000, .2f, .05f, .01f, .5f),
+        queuePackets = 256,
+    )
+    val congestedWifi = NetworkProfile(
+        id = "congested_wifi", name = "Congested Wi-Fi", latencyMs = 90, jitterMs = 35,
+        download = DirectionLimits(8_000, 2f, .1f, .02f, 2f),
+        upload = DirectionLimits(2_000, 3f, .1f, .02f, 2f),
+        queuePackets = 192,
+    )
     val weak4g = NetworkProfile(
-        id = "weak4g", name = "Weak 4G", latencyMs = 280, jitterMs = 100,
-        download = DirectionLimits(900, 8f, .5f, .1f, 3f),
-        upload = DirectionLimits(320, 10f, .5f, .1f, 3f),
+        id = "weak4g", name = "Weak 4G", latencyMs = 180, jitterMs = 60,
+        download = DirectionLimits(3_000, 4f, .2f, .05f, 2f),
+        upload = DirectionLimits(1_000, 5f, .2f, .05f, 2f),
+        queuePackets = 192,
+    )
+    val rural4g = NetworkProfile(
+        id = "rural4g", name = "Rural 4G", latencyMs = 240, jitterMs = 100,
+        download = DirectionLimits(1_500, 7f, .3f, .05f, 3f),
+        upload = DirectionLimits(384, 9f, .3f, .05f, 3f),
+        queuePackets = 160,
+    )
+    val slow3g = NetworkProfile(
+        id = "slow3g", name = "Slow 3G", latencyMs = 450, jitterMs = 180,
+        download = DirectionLimits(768, 12f, .5f, .1f, 4f),
+        upload = DirectionLimits(256, 14f, .5f, .1f, 4f),
         queuePackets = 128,
+        burst = BurstSchedule(impairedSeconds = 15, healthySeconds = 5),
     )
     val fading3g = NetworkProfile(
         id = "fading3g", name = "Fading 3G", latencyMs = 650, jitterMs = 240,
@@ -57,22 +83,24 @@ object BuiltInProfiles {
         burst = BurstSchedule(impairedSeconds = 12, healthySeconds = 3),
     )
     val fringeEdge = NetworkProfile(
-        id = "fringe_edge", name = "Fringe EDGE", latencyMs = 900, jitterMs = 350,
-        download = DirectionLimits(56, 35f, 1f, .3f, 10f),
-        upload = DirectionLimits(24, 40f, 1f, .3f, 10f),
-        queuePackets = 64,
+        id = "fringe_edge", name = "Fading EDGE", latencyMs = 800, jitterMs = 250,
+        download = DirectionLimits(128, 15f, .5f, .1f, 5f),
+        upload = DirectionLimits(48, 18f, .5f, .1f, 5f),
+        queuePackets = 96,
+        burst = BurstSchedule(impairedSeconds = 8, healthySeconds = 4),
     )
     val oneBar = NetworkProfile(
-        id = "one_bar", name = "One bar", latencyMs = 1_200, jitterMs = 650,
-        download = DirectionLimits(32, 55f, 2f, .5f, 12f),
-        upload = DirectionLimits(12, 60f, 2f, .5f, 12f),
-        queuePackets = 48,
+        id = "one_bar", name = "One bar", latencyMs = 1_000, jitterMs = 500,
+        download = DirectionLimits(64, 35f, 1f, .3f, 8f),
+        upload = DirectionLimits(24, 40f, 1f, .3f, 8f),
+        queuePackets = 64,
+        burst = BurstSchedule(impairedSeconds = 12, healthySeconds = 3),
     )
     val almostDisconnected = NetworkProfile(
         id = "almost_disconnected", name = "Almost disconnected",
-        latencyMs = 2_500, jitterMs = 1_200,
-        download = DirectionLimits(8, 85f, 3f, 1f, 15f),
-        upload = DirectionLimits(4, 88f, 3f, 1f, 15f),
+        latencyMs = 2_000, jitterMs = 900,
+        download = DirectionLimits(16, 70f, 2f, .5f, 12f),
+        upload = DirectionLimits(8, 75f, 2f, .5f, 12f),
         queuePackets = 24,
         burst = BurstSchedule(impairedSeconds = 18, healthySeconds = 2),
     )
@@ -88,7 +116,8 @@ object BuiltInProfiles {
     )
 
     val all = listOf(
-        weak4g, fading3g, fringeEdge, oneBar, almostDisconnected, deadZone, offline,
+        stableWifi, congestedWifi, weak4g, rural4g, slow3g, fading3g, fringeEdge,
+        oneBar, almostDisconnected, deadZone, offline,
     )
 }
 

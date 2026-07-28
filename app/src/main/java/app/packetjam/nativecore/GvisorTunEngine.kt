@@ -8,7 +8,6 @@ import app.packetjam.nativecore.packetjamtun.Engine
 import app.packetjam.nativecore.packetjamtun.Listener
 import app.packetjam.nativecore.packetjamtun.Packetjamtun
 import app.packetjam.vpn.NativeTunEngine
-import org.json.JSONObject
 
 /**
  * Android adapter for the ABI-specific Go/gVisor forwarding core packaged in
@@ -77,18 +76,32 @@ class GvisorTunEngine(
     }
 }
 
-private fun NetworkProfile.toNativeJson(): String = JSONObject()
-    .put("latencyMs", latencyMs)
-    .put("jitterMs", jitterMs)
-    .put("queuePackets", queuePackets)
-    .put("offline", offline)
-    .put("upload", upload.toNativeJson())
-    .put("download", download.toNativeJson())
-    .toString()
+internal fun NetworkProfile.toNativeJson(): String {
+    return buildString {
+        append('{')
+        append("\"latencyMs\":").append(latencyMs)
+        append(",\"jitterMs\":").append(jitterMs)
+        append(",\"queuePackets\":").append(queuePackets)
+        append(",\"offline\":").append(offline)
+        append(",\"upload\":").append(upload.toNativeJson())
+        append(",\"download\":").append(download.toNativeJson())
+        burst?.let {
+            append(",\"burst\":{\"impairedSeconds\":")
+                .append(it.impairedSeconds)
+                .append(",\"healthySeconds\":")
+                .append(it.healthySeconds)
+                .append('}')
+        }
+        append('}')
+    }
+}
 
-private fun DirectionLimits.toNativeJson(): JSONObject = JSONObject()
-    .put("rateKbps", rateKbps)
-    .put("lossPercent", lossPercent.toDouble())
-    .put("duplicatePercent", duplicatePercent.toDouble())
-    .put("corruptPercent", corruptPercent.toDouble())
-    .put("reorderPercent", reorderPercent.toDouble())
+private fun DirectionLimits.toNativeJson(): String = buildString {
+    append('{')
+    append("\"rateKbps\":").append(rateKbps)
+    append(",\"lossPercent\":").append(lossPercent)
+    append(",\"duplicatePercent\":").append(duplicatePercent)
+    append(",\"corruptPercent\":").append(corruptPercent)
+    append(",\"reorderPercent\":").append(reorderPercent)
+    append('}')
+}

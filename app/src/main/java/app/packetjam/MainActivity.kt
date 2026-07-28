@@ -128,6 +128,8 @@ private fun Dashboard(
             Spacer(Modifier.height(28.dp))
             ProfileStrip(state.selected, onSelect, enabled = !running)
             Spacer(Modifier.height(18.dp))
+            ProfileDetails(state.selected)
+            Spacer(Modifier.height(14.dp))
             StatsPanel(state.stats, state.selected)
             AnimatedVisibility(state.failure != null) {
                 Text(
@@ -144,6 +146,87 @@ private fun Dashboard(
         }
     }
 }
+
+@Composable
+private fun ProfileDetails(profile: NetworkProfile) {
+    Card(
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+        colors = CardDefaults.cardColors(containerColor = Panel),
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(
+                "PROFILE DETAILS",
+                color = Muted,
+                fontSize = 10.sp,
+                letterSpacing = 1.3.sp,
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                DetailCell("LATENCY", "${profile.latencyMs} ± ${profile.jitterMs} ms")
+                DetailCell("QUEUE", "${profile.queuePackets} packets")
+                DetailCell("STATE", if (profile.offline) "offline" else "online")
+            }
+            Spacer(Modifier.height(12.dp))
+            DirectionDetails("DOWNLOAD", profile.download)
+            Spacer(Modifier.height(8.dp))
+            DirectionDetails("UPLOAD", profile.upload)
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "BURST",
+                color = Muted,
+                fontSize = 9.sp,
+                letterSpacing = 1.sp,
+            )
+            Text(
+                profile.burst?.let {
+                    "${it.impairedSeconds}s impaired · ${it.healthySeconds}s healthy · rate cap retained"
+                } ?: "steady impairment",
+                color = Color.White,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DirectionDetails(label: String, limits: app.packetjam.model.DirectionLimits) {
+    Column {
+        Text(label, color = Muted, fontSize = 9.sp, letterSpacing = 1.sp)
+        Spacer(Modifier.height(3.dp))
+        Row(Modifier.fillMaxWidth()) {
+            DetailCell("RATE", formatRate(limits.rateKbps), Modifier.weight(1f))
+            DetailCell("LOSS", formatPercent(limits.lossPercent), Modifier.weight(1f))
+            DetailCell("DUP", formatPercent(limits.duplicatePercent), Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(3.dp))
+        Row(Modifier.fillMaxWidth()) {
+            DetailCell("CORRUPT", formatPercent(limits.corruptPercent), Modifier.weight(1f))
+            DetailCell("REORDER", formatPercent(limits.reorderPercent), Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun DetailCell(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        Text(label, color = Muted, fontSize = 8.sp, letterSpacing = .6.sp)
+        Text(value, color = Color.White, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+    }
+}
+
+private fun formatRate(kbps: Int): String = when {
+    kbps == 0 -> "∞"
+    kbps >= 1_000 -> {
+        val mbps = kbps / 1_000f
+        if (mbps == mbps.toInt().toFloat()) "${mbps.toInt()} Mbps" else "%.1f Mbps".format(mbps)
+    }
+    else -> "$kbps kbps"
+}
+
+private fun formatPercent(value: Float): String =
+    if (value == value.toInt().toFloat()) "${value.toInt()}%" else "%.2f%%".format(value)
 
 @Composable
 private fun Header(running: Boolean) {

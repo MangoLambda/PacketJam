@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.packetjam.model.BuiltInProfiles
+import app.packetjam.model.DirectionLimits
 import app.packetjam.model.NetworkProfile
 import app.packetjam.model.TrafficStats
 import app.packetjam.model.VpnStatus
@@ -152,67 +153,68 @@ private fun ProfileDetails(profile: NetworkProfile) {
     Card(
         Modifier.fillMaxWidth().padding(horizontal = 20.dp),
         colors = CardDefaults.cardColors(containerColor = Panel),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(18.dp)) {
             Text(
                 "PROFILE DETAILS",
                 color = Muted,
                 fontSize = 10.sp,
-                letterSpacing = 1.3.sp,
+                letterSpacing = 1.1.sp,
+                fontWeight = FontWeight.Medium,
             )
-            Spacer(Modifier.height(10.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                DetailCell("LATENCY", "${profile.latencyMs} ± ${profile.jitterMs} ms")
-                DetailCell("QUEUE", "${profile.queuePackets} packets")
-                DetailCell("STATE", if (profile.offline) "offline" else "online")
-            }
-            Spacer(Modifier.height(12.dp))
-            DirectionDetails("DOWNLOAD", profile.download)
             Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth()) {
+                MetricCell("LATENCY", "${profile.latencyMs} ± ${profile.jitterMs} ms", Modifier.weight(1f))
+                MetricCell("QUEUE", "${profile.queuePackets}", Modifier.weight(1f))
+                MetricCell("STATE", if (profile.offline) "offline" else "online", Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(10.dp))
+            DirectionDetails("DOWNLOAD", profile.download)
+            Spacer(Modifier.height(10.dp))
             DirectionDetails("UPLOAD", profile.upload)
             Spacer(Modifier.height(10.dp))
-            Text(
+            MetricCell(
                 "BURST",
-                color = Muted,
-                fontSize = 9.sp,
-                letterSpacing = 1.sp,
-            )
-            Text(
                 profile.burst?.let {
-                    "${it.impairedSeconds}s impaired · ${it.healthySeconds}s healthy · rate cap retained"
-                } ?: "steady impairment",
-                color = Color.White,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 11.sp,
+                    "${it.impairedSeconds}s impaired · ${it.healthySeconds}s healthy · capped"
+                } ?: "Steady",
             )
         }
     }
 }
 
 @Composable
-private fun DirectionDetails(label: String, limits: app.packetjam.model.DirectionLimits) {
+private fun DirectionDetails(label: String, limits: DirectionLimits) {
     Column {
-        Text(label, color = Muted, fontSize = 9.sp, letterSpacing = 1.sp)
-        Spacer(Modifier.height(3.dp))
+        Text(label, color = Muted, fontSize = 9.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.height(4.dp))
         Row(Modifier.fillMaxWidth()) {
-            DetailCell("RATE", formatRate(limits.rateKbps), Modifier.weight(1f))
-            DetailCell("LOSS", formatPercent(limits.lossPercent), Modifier.weight(1f))
-            DetailCell("DUP", formatPercent(limits.duplicatePercent), Modifier.weight(1f))
+            MetricCell("RATE", formatRate(limits.rateKbps), Modifier.weight(1f))
+            MetricCell("LOSS", formatPercent(limits.lossPercent), Modifier.weight(1f))
+            MetricCell("DUP", formatPercent(limits.duplicatePercent), Modifier.weight(1f))
         }
-        Spacer(Modifier.height(3.dp))
+        Spacer(Modifier.height(7.dp))
         Row(Modifier.fillMaxWidth()) {
-            DetailCell("CORRUPT", formatPercent(limits.corruptPercent), Modifier.weight(1f))
-            DetailCell("REORDER", formatPercent(limits.reorderPercent), Modifier.weight(1f))
+            MetricCell("CORRUPT", formatPercent(limits.corruptPercent), Modifier.weight(1f))
+            MetricCell("REORDER", formatPercent(limits.reorderPercent), Modifier.weight(1f))
+            Spacer(Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-private fun DetailCell(label: String, value: String, modifier: Modifier = Modifier) {
+private fun MetricCell(label: String, value: String, modifier: Modifier = Modifier) {
     Column(modifier) {
         Text(label, color = Muted, fontSize = 8.sp, letterSpacing = .6.sp)
-        Text(value, color = Color.White, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+        Spacer(Modifier.height(1.dp))
+        Text(
+            value,
+            color = Color.White,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 
@@ -220,13 +222,15 @@ private fun formatRate(kbps: Int): String = when {
     kbps == 0 -> "∞"
     kbps >= 1_000 -> {
         val mbps = kbps / 1_000f
-        if (mbps == mbps.toInt().toFloat()) "${mbps.toInt()} Mbps" else "%.1f Mbps".format(mbps)
+        if (mbps == mbps.toInt().toFloat()) "${mbps.toInt()} Mbps"
+        else String.format(Locale.US, "%.1f Mbps", mbps)
     }
     else -> "$kbps kbps"
 }
 
 private fun formatPercent(value: Float): String =
-    if (value == value.toInt().toFloat()) "${value.toInt()}%" else "%.2f%%".format(value)
+    if (value == value.toInt().toFloat()) "${value.toInt()}%"
+    else String.format(Locale.US, "%.2f%%", value)
 
 @Composable
 private fun Header(running: Boolean) {

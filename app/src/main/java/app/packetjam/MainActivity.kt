@@ -166,7 +166,7 @@ private fun ProfileDetails(profile: NetworkProfile) {
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth()) {
                 MetricCell("LATENCY", "${profile.latencyMs} ± ${profile.jitterMs} ms", Modifier.weight(1f))
-                MetricCell("QUEUE", "${profile.queuePackets}", Modifier.weight(1f))
+                MetricCell("Q CAP", "${profile.queuePackets}", Modifier.weight(1f))
                 MetricCell("STATE", if (profile.offline) "offline" else "online", Modifier.weight(1f))
             }
             Spacer(Modifier.height(10.dp))
@@ -357,11 +357,18 @@ private fun StatsPanel(stats: TrafficStats, profile: NetworkProfile) {
                 )
             }
             Spacer(Modifier.height(16.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Counter("DROPPED", stats.dropped)
-                Counter("DELAYED", stats.delayed)
-                Counter("REORDERED", stats.reordered)
-                Counter("CORRUPT", stats.corrupted)
+            Text("LIVE IMPAIRMENTS", color = Muted, fontSize = 9.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(7.dp))
+            Row(Modifier.fillMaxWidth()) {
+                Counter("DROP", stats.dropped, Modifier.weight(1f))
+                Counter("QUEUE", stats.queueOverflow, Modifier.weight(1f))
+                Counter("DELAY", stats.delayed, Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(9.dp))
+            Row(Modifier.fillMaxWidth()) {
+                Counter("REORDER", stats.reordered, Modifier.weight(1f))
+                Counter("CORRUPT", stats.corrupted, Modifier.weight(1f))
+                Counter("DUP", stats.duplicated, Modifier.weight(1f))
             }
         }
     }
@@ -409,9 +416,15 @@ internal fun formatBytes(bytes: Long): String {
 }
 
 @Composable
-private fun Counter(label: String, value: Long) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value.toString(), color = Color.White, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-        Text(label, color = Muted, fontSize = 8.sp, letterSpacing = .7.sp)
+private fun Counter(label: String, value: Long, modifier: Modifier = Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            value.toString(),
+            color = Color.White,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(label, color = Muted, fontSize = 9.sp, letterSpacing = .7.sp)
     }
 }

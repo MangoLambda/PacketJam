@@ -4,6 +4,15 @@ PacketJam is a no-root Android network impairment UI built around `VpnService`. 
 reproducible bad-network profiles, a deterministic packet scheduler, live runtime statistics,
 and safe VPN lifecycle handling.
 
+## Screenshots
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/packetjam-idle.png" alt="PacketJam idle dashboard" width="360"></td>
+    <td><img src="docs/screenshots/packetjam-active.png" alt="PacketJam shaping traffic dashboard" width="360"></td>
+  </tr>
+</table>
+
 ## Build
 
 Requirements:
